@@ -2,8 +2,9 @@
 # USE CASE 2: health-related quality of life #
 ##############################################
 
-library("readxl")
-library("dplyr")
+library(readxl)
+library(dplyr)
+library(tibble)
 
 # Read dataset on exercise HF
 #
@@ -11,11 +12,7 @@ dat2 <- read_excel("Exercise_HF_MLWHF.xlsx") %>%
   arrange(Year) # order according to year of publication
 
 
-# Install development version of R package meta from GitHub (with vignette):
-#remotes::install_github("guido-s/meta", build_vignettes = TRUE)
-# Install development version of R package meta from GitHub (without vignette):
-#remotes::install_github("guido-s/meta")
-library("meta")
+library(meta)
 settings.meta(digits = 2, digits.cid = 0)
 
 # Conduct meta-analysis
@@ -75,3 +72,79 @@ plot(cid2, legend = TRUE, col.predict = "blue",
   labels.x = c(-30, -20, -10, 0, 10, 20, 30))
 #
 dev.off()
+
+
+#
+#
+# Mathur & VanderWeele (2020), Epidemiology
+#
+#
+
+library(MetaUtility)
+
+d2 <- as.data.frame(m2) %>%
+  mutate(varTE = seTE^2)
+
+# Recommended calibrated method
+#
+set.seed(1919)
+# Lower decision threshold
+ps1_low <-
+  prop_stronger(q = -5,
+                tail = "below",
+                estimate.method = "calibrated",
+                ci.method = "calibrated",
+                dat = d2,
+                yi.name = "TE",
+                vi.name = "varTE",
+                R = 1000)
+# Upper decision threshold
+ps1_upp <-
+  prop_stronger(q = 5,
+                tail = "above",
+                estimate.method = "calibrated",
+                ci.method = "calibrated",
+                dat = d2,
+                yi.name = "TE",
+                vi.name = "varTE",
+                R = 1000)
+#
+bind_rows(ps1_low, ps1_upp) %>%
+  mutate(Threshold = c("\u2264 -5", "\u2265 5"),
+         grps = paste(c("Beneficial", "Harmful"), "effect"),
+         Percent = paste0(round(100 * est, 1), "%")) %>%
+  relocate(Threshold, .before = Percent) %>%
+  column_to_rownames(var = "grps") %>%
+  select(Threshold, Percent)
+
+
+# Parametric approach (based on standard normal distribution)
+#
+# Lower decision threshold
+ps2_low <-
+  prop_stronger(q = -5,
+                tail = "below",
+                estimate.method = "parametric",
+                ci.method = "parametric",
+                M = m2$TE.random,
+                se.M = m2$seTE.random,
+                t2 = m2$tau2,
+                bootstrap = "never")
+# Upper decision threshold
+ps2_upp <-
+  prop_stronger(q = 5,
+                tail = "above",
+                estimate.method = "parametric",
+                ci.method = "parametric",
+                M = m2$TE.random,
+                se.M = m2$seTE.random,
+                t2 = m2$tau2,
+                bootstrap = "never")
+#
+bind_rows(ps2_low, ps2_upp) %>%
+  mutate(Threshold = c("\u2264 -5", "\u2265 5"),
+         grps = paste(c("Beneficial", "Harmful"), "effect"),
+         Percent = paste0(round(100 * est, 1), "%")) %>%
+  relocate(Threshold, .before = Percent) %>%
+  column_to_rownames(var = "grps") %>%
+  select(Threshold, Percent)

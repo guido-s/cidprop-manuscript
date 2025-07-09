@@ -2,8 +2,9 @@
 # USE CASE 1: caesarean section #
 #################################
 
-library("readxl")
-library("dplyr")
+library(readxl)
+library(dplyr)
+library(tibble)
 
 # Read dataset on caesarean sections
 #
@@ -11,11 +12,7 @@ dat1 <- read_excel("Midwifery_caesarean_section.xlsx") %>%
   arrange(Year) # order according to year of publication
 
 
-# Install development version of R package meta from GitHub (with vignette):
-#remotes::install_github("guido-s/meta", build_vignettes = TRUE)
-# Install development version of R package meta from GitHub (without vignette):
-#remotes::install_github("guido-s/meta")
-library("meta")
+library(meta)
 settings.meta(digits = 2, digits.cid = 2)
 
 # Conduct meta-analysis
@@ -74,3 +71,79 @@ plot(cid1, legend = TRUE, col.predict = "blue",
   labels.x = c(0.5, 0.75, 1, 1.5, 1.8))
 #
 dev.off()
+
+
+#
+#
+# Mathur & VanderWeele (2020), Epidemiology
+#
+#
+
+library(MetaUtility)
+
+d1 <- as.data.frame(m1) %>%
+  mutate(varTE = seTE^2)
+
+# Recommended calibrated method
+#
+set.seed(1910)
+# Lower decision threshold
+ps1_low <-
+  prop_stronger(q = log(0.8),
+                tail = "below",
+                estimate.method = "calibrated",
+                ci.method = "calibrated",
+                dat = d1,
+                yi.name = "TE",
+                vi.name = "varTE",
+                R = 1000)
+# Upper decision threshold
+ps1_upp <-
+  prop_stronger(q = log(1.25),
+                tail = "above",
+                estimate.method = "calibrated",
+                ci.method = "calibrated",
+                dat = d1,
+                yi.name = "TE",
+                vi.name = "varTE",
+                R = 1000)
+#
+bind_rows(ps1_low, ps1_upp) %>%
+  mutate(Threshold = c("\u2264 0.8", "\u2265 1.25"),
+         grps = paste(c("Beneficial", "Harmful"), "effect"),
+         Percent = paste0(round(100 * est, 1), "%")) %>%
+  relocate(Threshold, .before = Percent) %>%
+  column_to_rownames(var = "grps") %>%
+  select(Threshold, Percent)
+
+
+# Parametric approach (based on standard normal distribution)
+#
+# Lower decision threshold
+ps2_low <-
+  prop_stronger(q = log(0.8),
+                tail = "below",
+                estimate.method = "parametric",
+                ci.method = "parametric",
+                M = m1$TE.random,
+                se.M = m1$seTE.random,
+                t2 = m1$tau2,
+                bootstrap = "never")
+# Upper decision threshold
+ps2_upp <-
+  prop_stronger(q = log(1.25),
+                tail = "above",
+                estimate.method = "parametric",
+                ci.method = "parametric",
+                M = m1$TE.random,
+                se.M = m1$seTE.random,
+                t2 = m1$tau2,
+                bootstrap = "never")
+#
+bind_rows(ps2_low, ps2_upp) %>%
+  mutate(Threshold = c("\u2264 0.8", "\u2265 1.25"),
+         grps = paste(c("Beneficial", "Harmful"), "effect"),
+         Percent = paste0(round(100 * est, 1), "%")) %>%
+  relocate(Threshold, .before = Percent) %>%
+  column_to_rownames(var = "grps") %>%
+  select(Threshold, Percent)
